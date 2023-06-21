@@ -1,6 +1,6 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
-import { readdirSync, statSync, accessSync, mkdirSync, writeFileSync } from 'fs';
+import { readdirSync, statSync, accessSync, mkdirSync, writeFileSync, unlinkSync } from 'fs';
 import path = require('path');
 import * as vscode from 'vscode';
 //import { NodeDependenciesProvider } from './nodeDependenciesProvider';
@@ -26,7 +26,9 @@ export function activate(context: vscode.ExtensionContext) {
 
 	const notesDataProvider = new NotesDataProvider(context);
 
-	vscode.window.registerTreeDataProvider('notes', notesDataProvider);
+	const notesTreeView = vscode.window.createTreeView('mdNotes', {
+		treeDataProvider: notesDataProvider
+	});
 
 	// vscode.window.createTreeView('nodeDependencies', {
 	// 	treeDataProvider: new NodeDependenciesProvider(rootPath)
@@ -46,13 +48,20 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	let disp2 = vscode.commands.registerCommand('vscode-notes.addNote', async () => {
+		const selectedItem = notesTreeView.selection[0];
+		console.log("resource", selectedItem);
+		const globalStoragePath = context.globalStorageUri.fsPath;
+
+		var folderPath = globalStoragePath;
+		if (selectedItem && selectedItem.contextValue === 'folder') {
+			folderPath = path.join(folderPath, selectedItem.label);
+		}
 		// The code you place here will be executed every time your command is executed
 		// Display a message box to the user
 		vscode.window.showInformationMessage('adding note');
 		const noteName = await vscode.window.showInputBox({ prompt: 'Enter the note name' });
 		if (noteName) {
-			const globalStoragePath = context.globalStorageUri.fsPath;
-			const notePath = path.join(globalStoragePath, `${noteName}.txt`);
+			const notePath = path.join(folderPath, `${noteName}.md`);
 			writeFileSync(notePath, '');
 			vscode.window.showTextDocument(vscode.Uri.file(notePath), { preview: false });
 			notesDataProvider.refresh(); // Refresh the tree to show the newly added note
@@ -77,6 +86,9 @@ export function activate(context: vscode.ExtensionContext) {
 			const globalStoragePath = context.globalStorageUri.fsPath;
 			const entryPath = path.join(globalStoragePath, resource.label);
 			const stats = statSync(entryPath);
+			// delete file using fs sync
+			unlinkSync(entryPath);
+			notesDataProvider.refresh(); // Refresh the tree to show the newly added note
 			if (stats.isDirectory()) {
 				vscode.window.showInformationMessage(`Deleting folder ${resource.label}`);
 			} else {
@@ -179,6 +191,7 @@ class NotesDataProvider implements vscode.TreeDataProvider<Note> {
     }
 
     private getNotesInDirectory(directoryPath: string): Note[] {
+
 		createFolderIfNotExists(directoryPath);
         const files = readdirSync(directoryPath);
         return files.map((file) => {
@@ -199,7 +212,7 @@ class NotesDataProvider implements vscode.TreeDataProvider<Note> {
 					command: 'vscode.open',
 					title: 'Open File',
 					arguments: [vscode.Uri.file(filePath)],
-				}
+				};
 			}
 			return item;
         });

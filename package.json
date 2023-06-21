@@ -37,7 +37,7 @@
     "viewsContainers": {
 			"activitybar": [
 				{
-					"id": "notes",
+					"id": "mdNotes",
 					"title": "Notes",
 					"icon": "media/dep.svg"
 				}
@@ -47,26 +47,30 @@
       "view/title": [
         {
           "command": "vscode-notes.addNote",
-          "when": "view == notes",
+          "when": "view == mdNotes",
           "group": "navigation"
         },
         {
           "command": "vscode-notes.addFolder",
-          "when": "view == notes",
+          "when": "view == mdNotes",
           "group": "navigation"
         }
       ],
       "view/item/context": [
         {
           "command": "vscode-notes.deleteEntry",
-          "when": "view == notes"
+          "when": "view == mdNotes"
+        },
+        {
+          "command": "vscode-notes.addNote",
+          "when": "view == mdNotes && viewItem == folder"
         }
       ]
     },
 		"views": {
-			"notes": [
+			"mdNotes": [
 				{
-					"id": "notes",
+					"id": "mdNotes",
 					"name": "Notes",
 					"icon": "media/dep.svg",
 					"contextualTitle": "Notes"
