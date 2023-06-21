@@ -186,7 +186,10 @@ class NotesDataProvider implements vscode.TreeDataProvider<Note> {
         if (!element) {
             const globalStoragePath = this.context.globalStorageUri.fsPath;
             return Promise.resolve(this.getNotesInDirectory(globalStoragePath));
-        }
+        } else if (element.contextValue == 'folder') {
+			const directoryPath = path.join(this.context.globalStorageUri.fsPath, element.label);
+			return Promise.resolve(this.getNotesInDirectory(directoryPath));
+		}
         return Promise.resolve([]);
     }
 
@@ -201,12 +204,12 @@ class NotesDataProvider implements vscode.TreeDataProvider<Note> {
                 file,
                 stat.isDirectory() ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None
             );
-			item.iconPath = new vscode.ThemeIcon('markdown');
 			//vscode.ThemeIcon.File;
 			if (stat.isDirectory()) {
 				item.iconPath = new vscode.ThemeIcon('folder');
 				item.contextValue = 'folder';
 			} else {
+				item.iconPath = new vscode.ThemeIcon('markdown');
 				item.contextValue = 'note';
 				item.command = {
 					command: 'vscode.open',
