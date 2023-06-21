@@ -31,7 +31,13 @@
       },
       {
         "command": "vscode-notes.deleteEntry",
-        "title": "Delete"
+        "title": "Delete",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "vscode-notes.renameEntry",
+        "title": "Rename",
+        "icon": "$(pencil)"
       }
     ],
     "viewsContainers": {
@@ -60,6 +66,16 @@
         {
           "command": "vscode-notes.deleteEntry",
           "when": "view == mdNotes"
+        },
+        {
+          "command": "vscode-notes.deleteEntry",
+          "when": "view == mdNotes",
+          "group": "inline"
+        },
+        {
+          "command": "vscode-notes.renameEntry",
+          "when": "view == mdNotes",
+          "group": "inline"
         },
         {
           "command": "vscode-notes.addNote",
