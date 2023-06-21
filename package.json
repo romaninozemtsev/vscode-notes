@@ -22,8 +22,16 @@
         "title": "Add Note"
       },
       {
+        "command": "vscode-notes.addFolder",
+        "title": "Add Folder"
+      },
+      {
         "command": "vscode-notes.openFile",
         "title": "Open File"
+      },
+      {
+        "command": "vscode-notes.deleteEntry",
+        "title": "Delete"
       }
     ],
     "viewsContainers": {
@@ -41,6 +49,17 @@
           "command": "vscode-notes.addNote",
           "when": "view == notes",
           "group": "navigation"
+        },
+        {
+          "command": "vscode-notes.addFolder",
+          "when": "view == notes",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "vscode-notes.deleteEntry",
+          "when": "view == notes"
         }
       ]
     },

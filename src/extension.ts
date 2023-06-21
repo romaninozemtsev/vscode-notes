@@ -58,8 +58,36 @@ export function activate(context: vscode.ExtensionContext) {
 			notesDataProvider.refresh(); // Refresh the tree to show the newly added note
 		}
 	});
+	let disp3 = vscode.commands.registerCommand('vscode-notes.addFolder', async () => {
+		// The code you place here will be executed every time your command is executed
+		// Display a message box to the user
+		vscode.window.showInformationMessage('adding folder');
+		const folderName = await vscode.window.showInputBox({ prompt: 'Enter the folder name' });
+		if (folderName) {
+			const globalStoragePath = context.globalStorageUri.fsPath;
+			const folderPath = path.join(globalStoragePath, folderName);
+			createFolderIfNotExists(folderPath);
+			notesDataProvider.refresh(); // Refresh the tree to show the newly added note
+		}
+	});
+	let disp4 = vscode.commands.registerCommand('vscode-notes.deleteEntry', async (resource) => {
+		// The code you place here will be executed every time your command is executed
+		// Display a message box to the user
+		if (resource) {
+			const globalStoragePath = context.globalStorageUri.fsPath;
+			const entryPath = path.join(globalStoragePath, resource.label);
+			const stats = statSync(entryPath);
+			if (stats.isDirectory()) {
+				vscode.window.showInformationMessage(`Deleting folder ${resource.label}`);
+			} else {
+				vscode.window.showInformationMessage(`Deleting note ${resource.label}`);
+			}
+		}
+	});
 	context.subscriptions.push(disposable);
 	context.subscriptions.push(disp2);
+	context.subscriptions.push(disp3);
+	context.subscriptions.push(disp4);
 	// context.subscriptions.push(vscode.commands.registerCommand('vscode-notes.openFile', async () => {
 
 	// });
@@ -110,6 +138,16 @@ class Note extends vscode.TreeItem {
     constructor(
         public readonly label: string,
         public readonly collapsibleState: vscode.TreeItemCollapsibleState,
+        public command?: vscode.Command
+    ) {
+        super(label, collapsibleState);
+    }
+}
+
+class Folder extends vscode.TreeItem {
+    constructor(
+        public readonly label: string,
+        public readonly collapsibleState: vscode.TreeItemCollapsibleState,
         public readonly command?: vscode.Command
     ) {
         super(label, collapsibleState);
@@ -148,15 +186,21 @@ class NotesDataProvider implements vscode.TreeDataProvider<Note> {
             const stat = statSync(filePath);
             const item = new Note(
                 file,
-                stat.isDirectory() ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None,
-                {
-                    command: 'vscode.open',
-                    title: 'Open File',
-                    arguments: [vscode.Uri.file(filePath)],
-                }
+                stat.isDirectory() ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None
             );
 			item.iconPath = new vscode.ThemeIcon('markdown');
 			//vscode.ThemeIcon.File;
+			if (stat.isDirectory()) {
+				item.iconPath = new vscode.ThemeIcon('folder');
+				item.contextValue = 'folder';
+			} else {
+				item.contextValue = 'note';
+				item.command = {
+					command: 'vscode.open',
+					title: 'Open File',
+					arguments: [vscode.Uri.file(filePath)],
+				}
+			}
 			return item;
         });
     }
