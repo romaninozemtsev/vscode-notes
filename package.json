@@ -15,7 +15,7 @@
     "configuration": {
       "title": "NotesMD",
       "properties": {
-        "notesLocation": {
+        "vscode-notes.notesLocation": {
           "type": "string",
           "default": "~/Documents/NotesMD",
           "description": "Notes location."

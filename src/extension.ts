@@ -47,10 +47,15 @@ export function activate(context: vscode.ExtensionContext) {
 		vscode.window.showInformationMessage('Hello World from vscode-notes!');
 	});
 
+	function getNotesPath(): string {
+		const settings = vscode.workspace.getConfiguration('vscode-notes');
+		return settings.get<string>('notesLocation') || context.globalStorageUri.fsPath;
+	}
+
 	let disp2 = vscode.commands.registerCommand('vscode-notes.addNote', async () => {
 		const selectedItem = notesTreeView.selection[0];
-		console.log("resource", selectedItem);
-		const globalStoragePath = context.globalStorageUri.fsPath;
+		
+		const globalStoragePath = getNotesPath(); //context.globalStorageUri.fsPath;
 
 		var folderPath = globalStoragePath;
 		if (selectedItem && selectedItem.contextValue === 'folder') {
@@ -103,6 +108,13 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(vscode.commands.registerCommand('vscode-notes.openSettings', async () => {
 		vscode.commands.executeCommand('workbench.action.openSettings', 'NotesMD');
 	}));
+
+	vscode.workspace.onDidChangeConfiguration(e => {
+		if (e.affectsConfiguration('notesLocation')) {
+			console.log("notesLocation changed", e);
+            notesDataProvider.refresh();
+        }
+    });
 	context.subscriptions.push(disposable);
 	context.subscriptions.push(disp2);
 	context.subscriptions.push(disp3);
@@ -193,7 +205,7 @@ class NotesDataProvider implements vscode.TreeDataProvider<Note> {
         if (!element) {
             const globalStoragePath = this.context.globalStorageUri.fsPath;
             return Promise.resolve(this.getNotesInDirectory(globalStoragePath));
-        } else if (element.contextValue == 'folder') {
+        } else if (element.contextValue === 'folder') {
 			const directoryPath = path.join(this.context.globalStorageUri.fsPath, element.label);
 			return Promise.resolve(this.getNotesInDirectory(directoryPath));
 		}
