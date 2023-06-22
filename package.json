@@ -12,6 +12,16 @@
   "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {
+    "configuration": {
+      "title": "NotesMD",
+      "properties": {
+        "notesLocation": {
+          "type": "string",
+          "default": "~/Documents/NotesMD",
+          "description": "Notes location."
+        }
+      }
+    },
     "commands": [
       {
         "command": "vscode-notes.helloWorld",
@@ -19,11 +29,18 @@
       },
       {
         "command": "vscode-notes.addNote",
-        "title": "Add Note"
+        "title": "Add Note",
+        "icon": "$(new-file)"
+      },
+      {
+        "command": "vscode-notes.openSettings",
+        "title": "Open Settings",
+        "icon": "$(settings-gear)"
       },
       {
         "command": "vscode-notes.addFolder",
-        "title": "Add Folder"
+        "title": "Add Folder",
+        "icon": "$(new-folder)"
       },
       {
         "command": "vscode-notes.openFile",
@@ -58,6 +75,11 @@
         },
         {
           "command": "vscode-notes.addFolder",
+          "when": "view == mdNotes",
+          "group": "navigation"
+        },
+        {
+          "command": "vscode-notes.openSettings",
           "when": "view == mdNotes",
           "group": "navigation"
         }

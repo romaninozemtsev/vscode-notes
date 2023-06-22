@@ -100,6 +100,9 @@ export function activate(context: vscode.ExtensionContext) {
 			}
 		}
 	});
+	context.subscriptions.push(vscode.commands.registerCommand('vscode-notes.openSettings', async () => {
+		vscode.commands.executeCommand('workbench.action.openSettings', 'NotesMD');
+	}));
 	context.subscriptions.push(disposable);
 	context.subscriptions.push(disp2);
 	context.subscriptions.push(disp3);
