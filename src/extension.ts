@@ -1,20 +1,20 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
-import { readdirSync, statSync, accessSync, mkdirSync, writeFileSync, unlinkSync, rmSync } from 'fs';
+import fs = require('fs');
 import path = require('path');
 import * as vscode from 'vscode';
-//import { NodeDependenciesProvider } from './nodeDependenciesProvider';
 
 const createFolderIfNotExists = (folderPath: string) => {
     try {
-        accessSync(folderPath);
+        fs.accessSync(folderPath);
         console.log('Folder already exists');
     } catch (error) {
         console.log('Folder does not exist, creating...');
-        mkdirSync(folderPath, { recursive: true });
+        fs.mkdirSync(folderPath, { recursive: true });
         console.log('Folder created');
     }
 };
+
+//vscode.window.showInformationMessage('adding note');
+		
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
@@ -24,145 +24,78 @@ export function activate(context: vscode.ExtensionContext) {
 	? vscode.workspace.workspaceFolders[0].uri.fsPath
 	: '';
 
-	const notesDataProvider = new NotesDataProvider(context);
-
-	const notesTreeView = vscode.window.createTreeView('mdNotes', {
-		treeDataProvider: notesDataProvider
-	});
-
-	// vscode.window.createTreeView('nodeDependencies', {
-	// 	treeDataProvider: new NodeDependenciesProvider(rootPath)
-	// });
-
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
-	console.log('Congratulations, your extension "vscode-notes" is now active!');
-
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with registerCommand
-	// The commandId parameter must match the command field in package.json
-	let disposable = vscode.commands.registerCommand('vscode-notes.helloWorld', () => {
-		// The code you place here will be executed every time your command is executed
-		// Display a message box to the user
-		vscode.window.showInformationMessage('Hello World from vscode-notes!');
-	});
-
 	function getNotesPath(): string {
 		const settings = vscode.workspace.getConfiguration('vscode-notes');
 		return settings.get<string>('notesLocation') || context.globalStorageUri.fsPath;
 	}
 
-	let disp2 = vscode.commands.registerCommand('vscode-notes.addNote', async () => {
+	const notesDataProvider = new NotesDataProvider(context, getNotesPath);
+
+	const notesTreeView = vscode.window.createTreeView('mdNotes', {
+		treeDataProvider: notesDataProvider
+	});
+
+	console.log('Congratulations, your extension "vscode-notes" is now active!');
+
+	let addNodeCommand = vscode.commands.registerCommand('vscode-notes.addNote', async () => {
 		const selectedItem = notesTreeView.selection[0];
 		
-		const globalStoragePath = getNotesPath(); //context.globalStorageUri.fsPath;
+		let folderPath = getNotesPath();
 
-		var folderPath = globalStoragePath;
 		if (selectedItem && selectedItem.contextValue === 'folder') {
 			folderPath = path.join(folderPath, selectedItem.label);
 		}
+		createFolderIfNotExists(folderPath);
 		// The code you place here will be executed every time your command is executed
 		// Display a message box to the user
-		vscode.window.showInformationMessage('adding note');
 		const noteName = await vscode.window.showInputBox({ prompt: 'Enter the note name' });
 		if (noteName) {
 			const notePath = path.join(folderPath, `${noteName}.md`);
-			writeFileSync(notePath, '');
+			fs.writeFileSync(notePath, '');
 			vscode.window.showTextDocument(vscode.Uri.file(notePath), { preview: false });
 			notesDataProvider.refresh(); // Refresh the tree to show the newly added note
 		}
 	});
-	let disp3 = vscode.commands.registerCommand('vscode-notes.addFolder', async () => {
-		// The code you place here will be executed every time your command is executed
-		// Display a message box to the user
-		vscode.window.showInformationMessage('adding folder');
+	let addFolderCommand = vscode.commands.registerCommand('vscode-notes.addFolder', async () => {
 		const folderName = await vscode.window.showInputBox({ prompt: 'Enter the folder name' });
 		if (folderName) {
-			const globalStoragePath = context.globalStorageUri.fsPath;
-			const folderPath = path.join(globalStoragePath, folderName);
+			const folderPath = path.join(getNotesPath(), folderName);
 			createFolderIfNotExists(folderPath);
-			notesDataProvider.refresh(); // Refresh the tree to show the newly added note
+			notesDataProvider.refresh();
 		}
 	});
-	let disp4 = vscode.commands.registerCommand('vscode-notes.deleteEntry', async (resource) => {
-		// The code you place here will be executed every time your command is executed
-		// Display a message box to the user
+	let deleteEntryCommand = vscode.commands.registerCommand('vscode-notes.deleteEntry', async (resource) => {
 		if (resource) {
-			const globalStoragePath = context.globalStorageUri.fsPath;
-			const entryPath = path.join(globalStoragePath, resource.label);
-			const stats = statSync(entryPath);
+			const entryPath = path.join(getNotesPath(), resource.label);
+			const stats = fs.statSync(entryPath);
 			// delete file using fs sync
 			if (resource.contextValue === 'folder') {
-				rmSync(entryPath, { recursive: true });
+				fs.rmSync(entryPath, { recursive: true });
 			} else {
-				unlinkSync(entryPath);
+				fs.unlinkSync(entryPath);
 			}
-			notesDataProvider.refresh(); // Refresh the tree to show the newly added note
-			if (stats.isDirectory()) {
-				vscode.window.showInformationMessage(`Deleting folder ${resource.label}`);
-			} else {
-				vscode.window.showInformationMessage(`Deleting note ${resource.label}`);
-			}
+			notesDataProvider.refresh();
 		}
 	});
-	context.subscriptions.push(vscode.commands.registerCommand('vscode-notes.openSettings', async () => {
+
+
+	const openSettingsCommand = vscode.commands.registerCommand('vscode-notes.openSettings', async () => {
 		vscode.commands.executeCommand('workbench.action.openSettings', 'NotesMD');
-	}));
+	});
 
 	vscode.workspace.onDidChangeConfiguration(e => {
-		if (e.affectsConfiguration('notesLocation')) {
+		if (e.affectsConfiguration('vscode-notes.notesLocation')) {
 			console.log("notesLocation changed", e);
             notesDataProvider.refresh();
         }
     });
-	context.subscriptions.push(disposable);
-	context.subscriptions.push(disp2);
-	context.subscriptions.push(disp3);
-	context.subscriptions.push(disp4);
-	// context.subscriptions.push(vscode.commands.registerCommand('vscode-notes.openFile', async () => {
 
-	// });
+	context.subscriptions.push(addNodeCommand);
+	context.subscriptions.push(openSettingsCommand);
+	context.subscriptions.push(addFolderCommand);
+	context.subscriptions.push(deleteEntryCommand);
+
 }
-
-class TreeDataProvider implements vscode.TreeDataProvider<TreeItem> {
-	onDidChangeTreeData?: vscode.Event<TreeItem|null|undefined>|undefined;
-  
-	data: TreeItem[];
-  
-	constructor() {
-	  this.data = [new TreeItem('cars', [
-		new TreeItem(
-			'Ford', [new TreeItem('Fiesta'), new TreeItem('Focus'), new TreeItem('Mustang')]),
-		new TreeItem(
-			'BMW', [new TreeItem('320'), new TreeItem('X3'), new TreeItem('X5')])
-	  ])];
-	}
-  
-	getTreeItem(element: TreeItem): vscode.TreeItem|Thenable<vscode.TreeItem> {
-	  return element;
-	}
-  
-	getChildren(element?: TreeItem|undefined): vscode.ProviderResult<TreeItem[]> {
-	  if (element === undefined) {
-		return this.data;
-	  }
-	  return element.children;
-	}
-  }
-  
-  class TreeItem extends vscode.TreeItem {
-	children: TreeItem[]|undefined;
-  
-	constructor(label: string, children?: TreeItem[]) {
-	  super(
-		  label,
-		  children === undefined ? vscode.TreeItemCollapsibleState.None :
-								   vscode.TreeItemCollapsibleState.Expanded);
-	  this.children = children;
-	}
-  }
-
-
 
 
 class Note extends vscode.TreeItem {
@@ -185,13 +118,15 @@ class Folder extends vscode.TreeItem {
     }
 }
 
+type NoParamsReturnString = () => string;
+
 
 
 class NotesDataProvider implements vscode.TreeDataProvider<Note> {
     private _onDidChangeTreeData: vscode.EventEmitter<Note | undefined | null | void> = new vscode.EventEmitter<Note | undefined | null | void>();
     readonly onDidChangeTreeData: vscode.Event<Note | undefined | null | void> = this._onDidChangeTreeData.event;
 
-    constructor(private readonly context: vscode.ExtensionContext) {}
+    constructor(private readonly context: vscode.ExtensionContext, private readonly pathFn: NoParamsReturnString) {}
 
     refresh(): void {
         this._onDidChangeTreeData.fire();
@@ -202,11 +137,12 @@ class NotesDataProvider implements vscode.TreeDataProvider<Note> {
     }
 
     getChildren(element?: Note): Thenable<Note[]> {
+		const globalPath = this.pathFn();
         if (!element) {
-            const globalStoragePath = this.context.globalStorageUri.fsPath;
+            const globalStoragePath = globalPath;
             return Promise.resolve(this.getNotesInDirectory(globalStoragePath));
         } else if (element.contextValue === 'folder') {
-			const directoryPath = path.join(this.context.globalStorageUri.fsPath, element.label);
+			const directoryPath = path.join(globalPath, element.label);
 			return Promise.resolve(this.getNotesInDirectory(directoryPath));
 		}
         return Promise.resolve([]);
@@ -214,21 +150,21 @@ class NotesDataProvider implements vscode.TreeDataProvider<Note> {
 
     private getNotesInDirectory(directoryPath: string): Note[] {
 		createFolderIfNotExists(directoryPath);
-        const filesAndDirs = readdirSync(directoryPath);
+        const filesAndDirs = fs.readdirSync(directoryPath);
 
 		const files = filesAndDirs
-		.filter(file => !statSync(path.join(directoryPath, file)).isDirectory())
+		.filter(file => !fs.statSync(path.join(directoryPath, file)).isDirectory())
 		.sort();
 
 		const dirs = filesAndDirs
-		.filter(file => statSync(path.join(directoryPath, file)).isDirectory())
+		.filter(file => fs.statSync(path.join(directoryPath, file)).isDirectory())
 		.sort();
 
 		const sortedFilesAndDirs = dirs.concat(files);
 		// TODO: optimize it.
         return sortedFilesAndDirs.map((file) => {
             const filePath = path.join(directoryPath, file);
-            const stat = statSync(filePath);
+            const stat = fs.statSync(filePath);
             const item = new Note(
                 file,
                 stat.isDirectory() ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None
