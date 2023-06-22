@@ -223,7 +223,7 @@ class NotesDataProvider implements vscode.TreeDataProvider<Note> {
             );
 			//vscode.ThemeIcon.File;
 			if (stat.isDirectory()) {
-				item.iconPath = new vscode.ThemeIcon('folder');
+				//item.iconPath = new vscode.ThemeIcon('folder');
 				item.contextValue = 'folder';
 			} else {
 				item.iconPath = new vscode.ThemeIcon('markdown');
