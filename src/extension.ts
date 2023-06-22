@@ -1,6 +1,6 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
-import { readdirSync, statSync, accessSync, mkdirSync, writeFileSync, unlinkSync } from 'fs';
+import { readdirSync, statSync, accessSync, mkdirSync, writeFileSync, unlinkSync, rmSync } from 'fs';
 import path = require('path');
 import * as vscode from 'vscode';
 //import { NodeDependenciesProvider } from './nodeDependenciesProvider';
@@ -87,7 +87,11 @@ export function activate(context: vscode.ExtensionContext) {
 			const entryPath = path.join(globalStoragePath, resource.label);
 			const stats = statSync(entryPath);
 			// delete file using fs sync
-			unlinkSync(entryPath);
+			if (resource.contextValue === 'folder') {
+				rmSync(entryPath, { recursive: true });
+			} else {
+				unlinkSync(entryPath);
+			}
 			notesDataProvider.refresh(); // Refresh the tree to show the newly added note
 			if (stats.isDirectory()) {
 				vscode.window.showInformationMessage(`Deleting folder ${resource.label}`);
@@ -194,10 +198,20 @@ class NotesDataProvider implements vscode.TreeDataProvider<Note> {
     }
 
     private getNotesInDirectory(directoryPath: string): Note[] {
-
 		createFolderIfNotExists(directoryPath);
-        const files = readdirSync(directoryPath);
-        return files.map((file) => {
+        const filesAndDirs = readdirSync(directoryPath);
+
+		const files = filesAndDirs
+		.filter(file => !statSync(path.join(directoryPath, file)).isDirectory())
+		.sort();
+
+		const dirs = filesAndDirs
+		.filter(file => statSync(path.join(directoryPath, file)).isDirectory())
+		.sort();
+
+		const sortedFilesAndDirs = dirs.concat(files);
+		// TODO: optimize it.
+        return sortedFilesAndDirs.map((file) => {
             const filePath = path.join(directoryPath, file);
             const stat = statSync(filePath);
             const item = new Note(
