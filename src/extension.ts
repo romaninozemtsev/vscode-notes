@@ -37,13 +37,17 @@ export function activate(context: vscode.ExtensionContext) {
 
 	console.log('Congratulations, your extension "vscode-notes" is now active!');
 
+	function getResourcePath(resource: Note) {
+		return resource.resourceUri?.fsPath || path.join(getNotesPath(), resource.label);
+	}
+
 	let addNodeCommand = vscode.commands.registerCommand('vscode-notes.addNote', async () => {
 		const selectedItem = notesTreeView.selection[0];
 		
 		let folderPath = getNotesPath();
 
 		if (selectedItem && selectedItem.contextValue === 'folder') {
-			folderPath = path.join(folderPath, selectedItem.label);
+			folderPath = getResourcePath(selectedItem);
 		}
 		createFolderIfNotExists(folderPath);
 		// The code you place here will be executed every time your command is executed
@@ -66,7 +70,7 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 	let deleteEntryCommand = vscode.commands.registerCommand('vscode-notes.deleteEntry', async (resource) => {
 		if (resource) {
-			const entryPath = path.join(getNotesPath(), resource.label);
+			const entryPath = getResourcePath(resource);
 			const stats = fs.statSync(entryPath);
 			// delete file using fs sync
 			if (resource.contextValue === 'folder') {
@@ -79,13 +83,14 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 	let renameFileCommand = vscode.commands.registerCommand('vscode-notes.renameEntry', async (resource) => {
 		if (resource) {
-			const entryPath = path.join(getNotesPath(), resource.label);
+			const entryPath =  getResourcePath(resource);
+			console.log("parent", resource.parent, typeof resource);
 			const stats = fs.statSync(entryPath);
-			console.log(resource.parent);
 			// rename file using fs sync
 			const newName = await vscode.window.showInputBox({ prompt: 'Enter the new name' });
 			if (newName) {
-				const newPath = path.join(getNotesPath(), newName);
+				const dirname = path.dirname(entryPath);
+				const newPath = path.join(dirname, newName);
 				fs.renameSync(entryPath, newPath);
 				notesDataProvider.refresh();
 			}
@@ -184,6 +189,7 @@ class NotesDataProvider implements vscode.TreeDataProvider<Note> {
                 file,
                 stat.isDirectory() ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None
             );
+			item.resourceUri = vscode.Uri.file(filePath);
 			//vscode.ThemeIcon.File;
 			if (stat.isDirectory()) {
 				//item.iconPath = new vscode.ThemeIcon('folder');
