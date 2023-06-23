@@ -77,6 +77,20 @@ export function activate(context: vscode.ExtensionContext) {
 			notesDataProvider.refresh();
 		}
 	});
+	let renameFileCommand = vscode.commands.registerCommand('vscode-notes.renameEntry', async (resource) => {
+		if (resource) {
+			const entryPath = path.join(getNotesPath(), resource.label);
+			const stats = fs.statSync(entryPath);
+			console.log(resource.parent);
+			// rename file using fs sync
+			const newName = await vscode.window.showInputBox({ prompt: 'Enter the new name' });
+			if (newName) {
+				const newPath = path.join(getNotesPath(), newName);
+				fs.renameSync(entryPath, newPath);
+				notesDataProvider.refresh();
+			}
+		}
+	});
 
 
 	const openSettingsCommand = vscode.commands.registerCommand('vscode-notes.openSettings', async () => {
@@ -94,6 +108,7 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(openSettingsCommand);
 	context.subscriptions.push(addFolderCommand);
 	context.subscriptions.push(deleteEntryCommand);
+	context.subscriptions.push(renameFileCommand);
 
 }
 

@@ -62,7 +62,7 @@
 				{
 					"id": "mdNotes",
 					"title": "Notes",
-					"icon": "media/dep.svg"
+					"icon": "$(notebook)"
 				}
 			]
 		},
