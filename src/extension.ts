@@ -87,11 +87,14 @@ export function activate(context: vscode.ExtensionContext) {
 			console.log("parent", resource.parent, typeof resource);
 			const stats = fs.statSync(entryPath);
 			// rename file using fs sync
-			const newName = await vscode.window.showInputBox({ prompt: 'Enter the new name' });
+			await vscode.workspace.saveAll(false);
+			const newName = await vscode.window.showInputBox({ prompt: 'Enter the new name', 'value': resource.label });
 			if (newName) {
+				await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
 				const dirname = path.dirname(entryPath);
 				const newPath = path.join(dirname, newName);
 				fs.renameSync(entryPath, newPath);
+				await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(newPath));
 				notesDataProvider.refresh();
 			}
 		}
@@ -108,6 +111,30 @@ export function activate(context: vscode.ExtensionContext) {
             notesDataProvider.refresh();
         }
     });
+
+	let previousEditor: vscode.TextEditor | undefined;
+
+	vscode.window.onDidChangeActiveTextEditor(async (editor) => {
+		let oldName = '';
+		let newName = '';
+		
+		if (previousEditor) {
+			oldName = previousEditor.document.fileName;
+			if (previousEditor.document.isDirty && oldName.includes(getNotesPath())) {
+				// auto save notes upon switching to another editor
+				console.log('autosaving old doc');
+				await previousEditor.document.save();
+			}
+			// The document property of a TextEditor refers to the document that the editor is currently showing.
+			// await previousEditor.document.save();
+		}
+		if (editor) {
+			newName = editor.document.fileName;
+		}
+		console.log(`editor	change from ${oldName} to ${newName}`);
+		// Update previous editor
+		previousEditor = editor;
+	});
 
 	context.subscriptions.push(addNodeCommand);
 	context.subscriptions.push(openSettingsCommand);
@@ -209,4 +236,6 @@ class NotesDataProvider implements vscode.TreeDataProvider<Note> {
 }
 
 // This method is called when your extension is deactivated
-export function deactivate() {}
+export function deactivate() {
+	console.log("deactivate!!!");
+}
