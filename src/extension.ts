@@ -1,15 +1,15 @@
-import fs = require('fs');
+import * as fs from 'fs/promises';
 import path = require('path');
 import * as vscode from 'vscode';
 
-const createFolderIfNotExists = (folderPath: string) => {
+const createFolderIfNotExists = async (folderPath: string) => {
     try {
-        fs.accessSync(folderPath);
-        console.log('Folder already exists');
+        await fs.access(folderPath);
+        //console.log('Folder already exists');
     } catch (error) {
-        console.log('Folder does not exist, creating...');
-        fs.mkdirSync(folderPath, { recursive: true });
-        console.log('Folder created');
+        //console.log('Folder does not exist, creating...');
+        await fs.mkdir(folderPath, { recursive: true });
+        //console.log('Folder created');
     }
 };
 
@@ -18,7 +18,7 @@ const createFolderIfNotExists = (folderPath: string) => {
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
 
 	const rootPath = vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0
 	? vscode.workspace.workspaceFolders[0].uri.fsPath
@@ -35,7 +35,7 @@ export function activate(context: vscode.ExtensionContext) {
 		treeDataProvider: notesDataProvider
 	});
 
-	console.log('Congratulations, your extension "vscode-notes" is now active!');
+	// console.log('Congratulations, your extension "vscode-notes" is now active!');
 
 	function getResourcePath(resource: Note) {
 		return resource.resourceUri?.fsPath || path.join(getNotesPath(), resource.label);
@@ -55,8 +55,8 @@ export function activate(context: vscode.ExtensionContext) {
 		const noteName = await vscode.window.showInputBox({ prompt: 'Enter the note name' });
 		if (noteName) {
 			const notePath = path.join(folderPath, `${noteName}.md`);
-			fs.writeFileSync(notePath, '');
-			vscode.window.showTextDocument(vscode.Uri.file(notePath), { preview: false });
+			await fs.writeFile(notePath, '');
+			await vscode.window.showTextDocument(vscode.Uri.file(notePath), { preview: false });
 			notesDataProvider.refresh(); // Refresh the tree to show the newly added note
 		}
 	});
@@ -71,32 +71,74 @@ export function activate(context: vscode.ExtensionContext) {
 	let deleteEntryCommand = vscode.commands.registerCommand('vscode-notes.deleteEntry', async (resource) => {
 		if (resource) {
 			const entryPath = getResourcePath(resource);
-			const stats = fs.statSync(entryPath);
+			const stats = await fs.stat(entryPath);
 			// delete file using fs sync
 			if (resource.contextValue === 'folder') {
-				fs.rmSync(entryPath, { recursive: true });
+				await fs.rm(entryPath, { recursive: true });
 			} else {
-				fs.unlinkSync(entryPath);
+				await fs.unlink(entryPath);
 			}
 			notesDataProvider.refresh();
 		}
 	});
+
+
 	let renameFileCommand = vscode.commands.registerCommand('vscode-notes.renameEntry', async (resource) => {
 		if (resource) {
-			const entryPath =  getResourcePath(resource);
-			console.log("parent", resource.parent, typeof resource);
-			const stats = fs.statSync(entryPath);
+			const oldPath =  getResourcePath(resource);
+			// console.log("parent", resource.parent, typeof resource);
+			// ensuring that the file exists
+			const stats = await fs.stat(oldPath);
 			// rename file using fs sync
-			await vscode.workspace.saveAll(false);
-			const newName = await vscode.window.showInputBox({ prompt: 'Enter the new name', 'value': resource.label });
-			if (newName) {
-				await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
-				const dirname = path.dirname(entryPath);
-				const newPath = path.join(dirname, newName);
-				fs.renameSync(entryPath, newPath);
-				await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(newPath));
-				notesDataProvider.refresh();
+			// await vscode.workspace.saveAll(false);
+			let newName = await vscode.window.showInputBox({ prompt: 'Enter the new name', 'value': resource.label });
+			if (!newName) {
+				return;
 			}
+
+			let shouldOpenFile = false;
+			let oldCopyClosed = false;
+
+			// if the document we are changing is an active document:
+			if (vscode.window.activeTextEditor?.document.uri.fsPath === oldPath) {
+				if (vscode.window.activeTextEditor?.document.isDirty) {
+					await vscode.window.activeTextEditor?.document.save();
+				}
+				// we also need to close it and reopen it
+				await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+
+				shouldOpenFile = true;
+				oldCopyClosed = true;
+			}
+
+
+			const dirname = path.dirname(oldPath);
+			let newPath = path.join(dirname, newName);
+			if (path.extname(newPath) === '') {
+				newPath = newPath + '.md';
+			}
+			
+			await fs.rename(oldPath, newPath);
+			if (shouldOpenFile) {
+				await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(newPath));
+			}
+			notesDataProvider.refresh();
+			
+			if (!oldCopyClosed) {
+				for (const tabGroup of vscode.window.tabGroups.all) {
+					//console.info("tabGroup", tabGroup);
+					for (const tab of tabGroup.tabs) {
+						if (tab.input instanceof vscode.TabInputText) {
+							//console.info("tab", tab.input.uri);
+							if (tab.input.uri.fsPath === oldPath) {
+								// console.info("closing tab", tab.input.uri);
+								await vscode.window.tabGroups.close(tab);
+							}
+						}
+					}
+				}
+			}
+			
 		}
 	});
 
@@ -131,7 +173,6 @@ export function activate(context: vscode.ExtensionContext) {
 		if (editor) {
 			newName = editor.document.fileName;
 		}
-		console.log(`editor	change from ${oldName} to ${newName}`);
 		// Update previous editor
 		previousEditor = editor;
 	});
@@ -195,25 +236,26 @@ class NotesDataProvider implements vscode.TreeDataProvider<Note> {
         return Promise.resolve([]);
     }
 
-    private getNotesInDirectory(directoryPath: string): Note[] {
+    private async getNotesInDirectory(directoryPath: string): Promise<Note[]> {
 		createFolderIfNotExists(directoryPath);
-        const filesAndDirs = fs.readdirSync(directoryPath);
+        const filesAndDirs = await fs.readdir(directoryPath);
 
-		const files = filesAndDirs
-		.filter(file => !fs.statSync(path.join(directoryPath, file)).isDirectory())
+		const filesAndDirsFullName = filesAndDirs.map(file => path.join(directoryPath, file));
+		const stats = await Promise.all(filesAndDirsFullName.map(filePath => fs.stat(filePath)));
+		const filesAndDirsStats = filesAndDirsFullName.map((filePath, index) => ({ fileName: filesAndDirs[index], filePath, stat: stats[index] }));
+		const files = filesAndDirsStats
+		.filter(({filePath, stat}) => !stat.isDirectory())
 		.sort();
 
-		const dirs = filesAndDirs
-		.filter(file => fs.statSync(path.join(directoryPath, file)).isDirectory())
+		const dirs = filesAndDirsStats
+		.filter(({filePath, stat}) => stat.isDirectory())
 		.sort();
 
 		const sortedFilesAndDirs = dirs.concat(files);
 		// TODO: optimize it.
-        return sortedFilesAndDirs.map((file) => {
-            const filePath = path.join(directoryPath, file);
-            const stat = fs.statSync(filePath);
+        return sortedFilesAndDirs.map(({fileName, filePath, stat}) => {
             const item = new Note(
-                file,
+                fileName,
                 stat.isDirectory() ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None
             );
 			item.resourceUri = vscode.Uri.file(filePath);
